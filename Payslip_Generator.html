@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Natural State Payslip Generator</title>
+<style>
+  :root{
+    --radius:12px; --pad:14px; --gap:12px; --shadow:0 8px 24px rgba(0,0,0,.08);
+    --bg:#0b1020; --panel:#12182c; --muted:#9fb0d1; --ink:#eef3ff; --accent:#79b8ff; --accent2:#9bffde;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:linear-gradient(135deg,#0b1020,#141a33 70%);color:var(--ink);font:16px/1.35 system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
+  h1,h2,h3{margin:0 0 8px}
+  .wrap{max-width:1100px;margin:32px auto;padding:0 16px;text-align:center}
+  .hero{margin-bottom:18px}
+  .badge{padding:6px 10px;border:1px solid #2a385f;border-radius:999px;color:var(--muted);font-size:14px}
+  .panel{background:var(--panel);border:1px solid #223057;border-radius:var(--radius);padding:var(--pad);box-shadow:var(--shadow);text-align:left}
+  .grid{display:grid;gap:var(--gap)}
+  .cols-2{grid-template-columns:1fr 1fr}
+  .cols-3{grid-template-columns:1fr 1fr 1fr}
+  label{display:block;font-weight:600;margin-bottom:6px;color:#cfe2ff}
+  input,select,textarea,button{
+    width:100%;padding:12px 12px;border-radius:10px;border:1px solid #2a385f;background:#0d1427;color:var(--ink)
+  }
+  button{cursor:pointer;background:linear-gradient(120deg,#2d68ff,#23c9a9);border:none;font-weight:700;margin-top:16px}
+  table{width:100%;border-collapse:collapse}
+  th,td{padding:10px;border-bottom:1px solid #223057;text-align:left}
+  th{color:#cfe2ff;font-weight:700}
+  .note{color:var(--muted);font-size:14px}
+  .pill{display:inline-block;padding:4px 10px;border-radius:999px;background:#0d1427;border:1px solid #2a385f;color:#cfe2ff;font-size:12px}
+  .ok{color:#8dffb3}
+  .err{color:#ff9b9b}
+  .brand{font-weight:800;font-size:28px;letter-spacing:.3px;background:linear-gradient(90deg,#9bffde,#79b8ff);-webkit-background-clip:text;background-clip:text;color:transparent;display:block;margin-bottom:8px}
+  h2{font-size:20px;text-align:left}
+  #payslip{margin-top:20px;}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="hero">
+      <div class="brand">Payslip Generator for the State of Arkansas</div>
+      <span class="badge">FLSA weekly OT · AR min wage $11</span>
+    </div>
+
+    <div class="panel">
+      <h2>Enter Associate Data</h2>
+
+      <div class="grid cols-2">
+        <div>
+          <label>Associate name</label>
+          <input id="empName" placeholder="e.g., Jordan Lee" />
+        </div>
+        <div>
+          <label>Employee ID (optional)</label>
+          <input id="empId" placeholder="e.g., ARK-1027" />
+        </div>
+      </div>
+
+      <div class="grid cols-3">
+        <div>
+          <label>Pay period (start → end)</label>
+          <select id="periodSelect"></select>
+        </div>
+        <div>
+          <label>Check date (auto)</label>
+          <input id="checkDate" readonly />
+        </div>
+        <div>
+          <label>Hourly rate (USD)</label>
+          <input type="number" id="hourlyRate" step="0.01" min="11" placeholder="≥ 11.00" />
+        </div>
+      </div>
+
+      <div class="grid cols-2">
+        <div>
+          <label>401K % Employee Deduction</label>
+          <input type="number" id="k401" step="0.1" min="0" max="100" placeholder="e.g., 5" />
+        </div>
+      </div>
+
+      <div id="hoursTableWrap" class="panel">
+        <h3>Enter hours for each day (two weeks)</h3>
+        <div class="grid cols-2" id="tablesContainer"></div>
+      </div>
+
+      <div class="panel">
+        <h3>Summary</h3>
+        <div class="grid cols-2">
+          <div><span class="pill">Week 1 hours</span><div id="w1h">0.00</div></div>
+          <div><span class="pill">Week 2 hours</span><div id="w2h">0.00</div></div>
+          <div><span class="pill">Gross pay</span><div id="gross">$0.00</div></div>
+          <div><span class="pill">Net pay</span><div id="net">$0.00</div></div>
+        </div>
+        <div class="note" id="wageNote"></div>
+      </div>
+
+      <button id="computeBtn">Generate Payslip</button>
+      <div id="payslip" class="panel hidden"></div>
+    </div>
+  </div>
+
+<script>
+(function(){
+  const $ = sel => document.querySelector(sel);
+
+  // Generate dropdowns for 2025–2026
+  (function(){
+    const periodSel=$('#periodSelect');
+    const start0=new Date("2025-01-04"); // start of year biweekly
+    const endYear=2026;let cur=new Date(start0);
+    while(cur.getFullYear()<=endYear){
+      const end=new Date(cur);end.setDate(cur.getDate()+13);
+      const check=new Date(end);check.setDate(end.getDate()+6);
+      const p=document.createElement('option');
+      p.value=cur.toISOString().split('T')[0];
+      p.dataset.end=end.toISOString().split('T')[0];
+      p.dataset.check=check.toISOString().split('T')[0];
+      p.textContent=`${cur.toLocaleDateString()} – ${end.toLocaleDateString()}`;
+      periodSel.appendChild(p);
+      cur.setDate(cur.getDate()+14);
+    }
+    periodSel.addEventListener('change',e=>{
+      $('#checkDate').value=e.target.selectedOptions[0].dataset.check;
+    });
+    periodSel.selectedIndex=0;
+    $('#checkDate').value=periodSel.selectedOptions[0].dataset.check;
+  })();
+
+  // Hours table
+  const tablesContainer=$('#tablesContainer');let dayInputs=[];
+  function buildTables(){tablesContainer.innerHTML='';dayInputs=[];
+    for(let w=1;w<=2;w++){const box=document.createElement('div');box.className='panel';
+      const tbl=document.createElement('table');
+      const thead=document.createElement('thead');thead.innerHTML=`<tr><th colspan=2>Week ${w}</th></tr><tr><th>Day</th><th>Hours</th></tr>`;
+      const tbody=document.createElement('tbody');
+      for(let d=0;d<7;d++){const tr=document.createElement('tr');const dn=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'][d];
+        tr.innerHTML=`<td>${dn}</td><td><input type=number step=0.01 min=0 value=0 class=hrs></td>`;tbody.appendChild(tr);}
+      tbl.appendChild(thead);tbl.appendChild(tbody);box.appendChild(tbl);tablesContainer.appendChild(box);}dayInputs=[...document.querySelectorAll('.hrs')];}
+  buildTables();
+
+  function compute(){
+    const hours=dayInputs.map(i=>parseFloat(i.value||'0'));
+    const w1=hours.slice(0,7),w2=hours.slice(7,14);
+    const w1t=w1.reduce((a,b)=>a+b,0),w2t=w2.reduce((a,b)=>a+b,0);
+    const rate=parseFloat($('#hourlyRate').value||'0');
+
+    // overtime > 40 per week
+    const w1reg=Math.min(w1t,40),w1ot=Math.max(0,w1t-40);
+    const w2reg=Math.min(w2t,40),w2ot=Math.max(0,w2t-40);
+    const regPay=(w1reg+w2reg)*rate;
+    const otPay=(w1ot+w2ot)*rate*1.5;
+    const gross=regPay+otPay;
+
+    // 401k
+    const k401pct=parseFloat($('#k401').value||'0')/100;
+    const k401emp=gross*k401pct;
+    const k401match=gross*Math.min(k401pct,0.05);
+
+    // Deductions
+    const fedTax=gross*0.12;
+    const stateTax=gross*0.05;
+    const ss=gross*0.062;
+    const medicare=gross*0.0145;
+    const totalDeductions=fedTax+stateTax+ss+medicare+k401emp;
+    const net=gross-totalDeductions;
+
+    $('#w1h').textContent=w1t.toFixed(2);$('#w2h').textContent=w2t.toFixed(2);
+    $('#gross').textContent='$'+gross.toFixed(2);$('#net').textContent='$'+net.toFixed(2);
+    if(rate&&rate<11){$('#wageNote').innerHTML='<span class=err>Below Arkansas minimum wage ($11)</span>';}else if(rate){$('#wageNote').innerHTML='<span class=ok>Meets minimum wage</span>';}else{$('#wageNote').textContent='';}
+    return{w1t,w2t,regPay,otPay,gross,net,rate,fedTax,stateTax,ss,medicare,k401emp,k401match,totalDeductions};
+  }
+  document.addEventListener('input',e=>{if(e.target.matches('input'))compute();});
+  compute();
+
+  $('#computeBtn').onclick=()=>{
+    const rate=$('#hourlyRate').value;
+    if(!rate || parseFloat(rate)<11){alert("Hourly rate must be entered and ≥ $11 (Arkansas minimum wage)");return;}
+
+    const c=compute();
+    const per=$('#periodSelect').selectedOptions[0];
+    const slip=`<h3>Payslip</h3>
+      <p><b>Employee:</b> ${$('#empName').value||'-'} (${($('#empId').value)||''})</p>
+      <p><b>Pay period:</b> ${per.textContent}</p>
+      <p><b>Check date:</b> ${$('#checkDate').value}</p>
+      <table>
+        <tr><th>Earnings</th><th>Amount</th></tr>
+        <tr><td>Regular Earnings</td><td>$${c.regPay.toFixed(2)}</td></tr>
+        <tr><td>Overtime Earnings</td><td>$${c.otPay.toFixed(2)}</td></tr>
+        <tr><td>Gross Pay</td><td>$${c.gross.toFixed(2)}</td></tr>
+      </table>
+      <table>
+        <tr><th>Deductions</th><th>Amount</th></tr>
+        <tr><td>Federal Tax (12%)</td><td>$${c.fedTax.toFixed(2)}</td></tr>
+        <tr><td>State Tax (5%)</td><td>$${c.stateTax.toFixed(2)}</td></tr>
+        <tr><td>Social Security (6.2%)</td><td>$${c.ss.toFixed(2)}</td></tr>
+        <tr><td>Medicare (1.45%)</td><td>$${c.medicare.toFixed(2)}</td></tr>
+        <tr><td>401K Employee Contribution</td><td>$${c.k401emp.toFixed(2)}</td></tr>
+        <tr><td><b>Total Deductions</b></td><td><b>$${c.totalDeductions.toFixed(2)}</b></td></tr>
+      </table>
+      <table>
+        <tr><th>Net Pay</th><th>$${c.net.toFixed(2)}</th></tr>
+        <tr><th>Employer 401K Match</th><th>$${c.k401match.toFixed(2)}</th></tr>
+      </table>`;
+    const ps=$('#payslip');ps.innerHTML=slip;ps.classList.remove('hidden');
+  };
+})();
+</script>
+</body>
+</html>
