@@ -62,7 +62,13 @@ def calculate_state_tax(taxable_income, state):
 # Step 4: Main Payroll Calculation
 # -------------------------------
 def generate_biweekly_payslip(name, annual_salary, employee_401k_pct, state):
+    if annual_salary <= 0:
+        raise ValueError("Annual salary must be greater than zero.")
+
     biweekly_gross = annual_salary / BIWEEKLY_PERIODS
+    if biweekly_gross / 80 < 12.0:  # Assuming 80 hours in two weeks, minimum wage $12/hr
+        raise ValueError("Biweekly pay is below the state minimum wage.")
+
     employee_401k = biweekly_gross * (employee_401k_pct / 100)
     taxable_income = biweekly_gross - employee_401k
 
@@ -76,6 +82,8 @@ def generate_biweekly_payslip(name, annual_salary, employee_401k_pct, state):
     payslip = {
         "Name": name,
         "Gross Pay": round(biweekly_gross, 2),
+        "Regular Earnings": round(biweekly_gross - max(0, biweekly_gross - 2080/BIWEEKLY_PERIODS * 50), 2),
+        "Overtime Earnings": round(max(0, biweekly_gross - 2080/BIWEEKLY_PERIODS * 50), 2),
         "401k Deduction": round(employee_401k, 2),
         "Federal Tax": round(federal_tax, 2),
         "Social Security": round(social_security, 2),
@@ -92,7 +100,7 @@ if __name__ == "__main__":
 #    name = "Arif Shaik"
 #    annual_salary = 65000
 #    employee_401k_pct = 6
-#    state = "CA"
+#    state = "TX"
     name = input("Enter employee name: ")
     annual_salary = float(input("Enter annual salary (USD): "))
     employee_401k_pct = float(input("Enter 401k deduction %: "))
@@ -103,3 +111,9 @@ if __name__ == "__main__":
     print("\n--- Biweekly Payslip ---")
     for key, value in payslip.items():
         print(f"{key}: ${value}")
+
+    print("\n--- How to Run This Online ---")
+    print("1. Go to https://replit.com/~ or https://colab.research.google.com/~")
+    print("2. Click 'New Repl' or 'New Notebook', select Python.")
+    print("3. Copy-paste the contents of this file into the editor.")
+    print("4. Run the script to generate the payslip instantly.")
