@@ -112,8 +112,3 @@ if __name__ == "__main__":
     for key, value in payslip.items():
         print(f"{key}: ${value}")
 
-    print("\n--- How to Run This Online ---")
-    print("1. Go to https://replit.com/~ or https://colab.research.google.com/~")
-    print("2. Click 'New Repl' or 'New Notebook', select Python.")
-    print("3. Copy-paste the contents of this file into the editor.")
-    print("4. Run the script to generate the payslip instantly.")
